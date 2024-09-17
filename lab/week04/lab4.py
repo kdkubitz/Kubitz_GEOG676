@@ -18,11 +18,12 @@ with open("C:/DevSource/Kubitz_GEOG676/lab/week04/garages.csv", "r") as file:
                 # print(X, Y)
 
         # Creating a GDB
-        # garages_path = "C:/DevSource/676_L4"
-        # arcpy.CreateFileGDB_management(garages_path, "Garages.gdb")
+        garages_path = "C:/DevSource/676_L4"
+        arcpy.CreateFileGDB_management(garages_path, "Garages.gdb")
+        
         # Adding Coordinate Layer
-        # garages = arcpy.management.MakeXYEventLayer("C:/DevSource/Kubitz_GEOG676/lab/week04/garages.csv", "X", "Y", "grgs")
-        # arcpy.FeatureClassToGeodatabase_conversion(garages, "C:/DevSource/676_L4/Garages.gdb")
+        garages = arcpy.management.MakeXYEventLayer("C:/DevSource/Kubitz_GEOG676/lab/week04/garages.csv", "X", "Y", "grgs")
+        arcpy.FeatureClassToGeodatabase_conversion(garages, "C:/DevSource/676_L4/Garages.gdb")
 
 grgsGDB = "C:/DevSource/676_L4/Garages.gdb"
 
