@@ -1,16 +1,16 @@
-import arcpy
+import arcpy, time
 
 class Toolbox(object):
     def __init__(self):
         # Define the toolbox (the name of the toolbox is the name of the .pyt file).
         self.label = "Toolbox"
         self.alias = ""
-        self.tools = [OrangeMaker]
+        self.tools = [GreenMaker]
 
-class OrangeMaker(object):
+class GreenMaker(object):
     def __init__(self):
         # Define the tool (tool name is the name of the class).
-        self.label = "OrangeMaker"
+        self.label = "GreenMaker"
         self.description = ""
         self.canRunInBackground = False
 
@@ -24,7 +24,7 @@ class OrangeMaker(object):
             direction="Input"
         ) 
         param1 = arcpy.Parameter(
-            displayName="Field on which to base Symbology",
+            displayName="Field on which to calculate Graduations",
             name="symbologyName",
             datatype="Field",
             parameterType="Required",
@@ -33,25 +33,34 @@ class OrangeMaker(object):
         params = [param0, param1]
         return params
 
-    #def updateParameters(self, parameters):
-        # Modify the values and properties of parameters before internal
-        # validation is performed.  This method is called whenever a parameter
-        # has been changed.
-    #    return
-
-    #def updateMessages(self, parameters):
+    def updateMessages(self, parameters):
         # Modify the messages created by internal validation for each tool
         # parameter.  This method is called after internal validation.
-    #    return
+        return
 
     def execute(self, parameters, messages):
         # The source code of the tool.
+        readTime = 2
+        start = 0
+        max = 100
+        step = 33
+
+        # Progressor Step 1
+        arcpy.SetProgressor("step", "Initializing...", start, max, step)
+        time.sleep(readTime)
+        arcpy.AddMessage("Initializing...")
+
         # Reference to our .aprx
         project = arcpy.mp.ArcGISProject("CURRENT")
-        currentgdb = "C:/DevSource/676_L4"
 
         # Grab the first map in the .aprx
         currentmap = project.listMaps('Map')[0]
+
+        # Progressor Step 2
+        arcpy.SetProgressorPosition(start + step)
+        arcpy.SetProgressorLabel("Searching for Layer...")
+        time.sleep(readTime)
+        arcpy.AddMessage("Searching for Layer")
 
         # Loop through available layers in the map
         for layer in currentmap.listLayers():
@@ -66,25 +75,37 @@ class OrangeMaker(object):
                 if hasattr(symbology, 'renderer'):
 
                     # Check if the layer's name is User Input
-                    if layer.name == parameters[1]:
+                    if layer.name == parameters[0].valueAsText:
+
+                        # Progressor Step 3
+                        arcpy.SetProgressorPosition(start + step*2)
+                        arcpy.SetProgressorLabel("Classifying...")
+                        time.sleep(readTime)
+                        arcpy.AddMessage("Classifying...")
 
                         # Update the copy's renderer to be 'GraduatedColorsRenderer'
                         symbology.updateRenderer('GraduatedColorsRenderer')
 
                         # Tell arcpy which field we want to base our choropleth off of
-                        symbology.renderer.classificationField = parameters[2]
+                        symbology.renderer.classificationField = parameters[1].valueAsText
 
                         # Set how many classes we'll have 
                         symbology.renderer.breakCount = 5
 
                         # Set the color ramp
-                        symbology.renderer.colorRamp = project.listColorRamps('Oranges (5 Classes)')[0]
+                        symbology.renderer.colorRamp = project.listColorRamps('Greens (5 Classes)')[0]
 
                         # Set the layer's actual symbology equal to the copy's
                         layer.symbology = symbology 
 
                     else:
                         print("NOT Valid Layer")
-            
-            project.saveACopy(currentgdb + "/copy")
 
+            # Progressor Step 4
+            arcpy.SetProgressorPosition(start + step*3)
+            arcpy.SetProgressorLabel("Finishing...")
+            time.sleep(readTime)
+            arcpy.AddMessage("Finishing...")
+
+            project.save()
+            return
