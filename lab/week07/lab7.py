@@ -8,7 +8,7 @@ band2 = arcpy.sa.Raster(source + "/band2.TIF") # green
 band3 = arcpy.sa.Raster(source + "/band3.TIF") # red
 band4 = arcpy.sa.Raster(source + "/band4.TIF") # NIR
 
-# Composite
+# Composite Raster
 composite = arcpy.CompositeBands_management([band1, band2, band3, band4], source + "/combined.tif")
 
 # Hillshade
