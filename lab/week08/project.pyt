@@ -1,4 +1,5 @@
 import arcpy
+import arcpy.conversion
 import arcpy.management
 
 class Toolbox(object):
@@ -16,21 +17,41 @@ class CNIM(object):
     def getParameterInfo(self):
         # input .xlsx table (is it possible to use .slk?)
         param0 = arcpy.Parameter(
-        displayName="Input CSV Table",
-        name="inputTable",
-        datatype="DETable",
-        parameterType="Required",
-        direction="Input"
+            displayName="Input CSV Table",
+            name="inputTable",
+            datatype="DETable",
+            parameterType="Required",
+            direction="Input"
         )
         param1 = arcpy.Parameter(
-        displayName="CIS Service Info Layer",
-        name="CISLayer",
-        datatype="GPLayer",
-        parameterType="Required",
-        direction="Input"
+            displayName="CIS Service Info Layer",
+            name="CISLayer",
+            datatype="GPLayer",
+            parameterType="Required",
+            direction="Input"
         )
-
-        params = [param0, param1]
+        param2 = arcpy.Parameter(
+            displayName="Name of Output Shapefile",
+            name="output_shapefile",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input"
+        )
+        param3 = arcpy.Parameter(
+            displayName="Name of Output CSV",
+            name="output_csv",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input"
+        )
+        param4 = arcpy.Parameter(
+            displayName="Output Folder",
+            name="outputfolder",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
+        params = [param0, param1, param2, param3, param4]
         return params
 
     def isLicensed(self):
@@ -48,23 +69,44 @@ class CNIM(object):
         current_map = project.listMaps('Map')[0]
         input_table = parameters[0].valueAsText
         CIS = parameters[1].valueAsText
-    
-        # Take input table, add to project
-        current_map.addTable(input_table)
+
+        try: 
+            # Add input table to project
+            current_map.addTable(input_table)
         
-        # Conduct join on CIS feature class
-        CIS_join_field = "Service ID"
-        table_join_field = "ServLoc"
-        arcpy.management.AddJoin(CIS, CIS_join_field, input_table, table_join_field)
+            # Conduct join on CIS feature class
+            CIS_join_field = "Service ID"
+            table_join_field = "ServLoc"
+            join_output = "in_memory\\CIS_join"
+            arcpy.management.AddJoin(CIS, CIS_join_field, input_table, table_join_field)
 
-        # Perform Select by Attributes on resulting joined table
+            # Perform Select by Attributes on resulting joined table
+            selection_query = "ServLoc IS NOT NULL"
+            arcpy.management.SelectLayerByAttribute(join_output, "NEW SELECTION", selection_query)
 
-        # Export results to shapefile, add to project
+            # Export results to shapefile
+            output_shapefile = parameters[2].valueAsText
+            arcpy.management.CopyFeatures(join_output, output_shapefile)
 
-        # Calculate Geometry on Lat / Long (is it possible to swap fields?)
+            # Add new shapefile to map
+            current_map.addDataFromPath(output_shapefile)
 
-        # Export new table as .csv
+            # Calculate Geometry on Lat / Long (is it possible to swap fields?)
+            lat_field = "Latitude"
+            long_field = "Longitude"
+            arcpy.management.CalculateGeometryAttributes(output_shapefile, [
+                [lat_field, "POINT_Y"]
+                [long_field, "POINT_X"]
+            ])
 
-        project.save()
+            # Export new table as .csv
+            # csv_output = parameters[3].valueAsText
+            # arcpy.conversion.TableToTable(output_shapefile, "placeholder directory", csv_output)
+
+            project.save()
+        
+        except Exception as e:
+            messages.addErrorMessage(f"An error occurred: {e}")
+
         return
  
