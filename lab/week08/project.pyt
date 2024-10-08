@@ -15,21 +15,22 @@ class CNIM(object):
         self.canRunInBackground = False
 
     def getParameterInfo(self):
-        # input .xlsx table (is it possible to use .slk?)
         param0 = arcpy.Parameter(
             displayName="Input CSV Table",
-            name="inputTable",
-            datatype="DETable",
+            name="input_table",
+            datatype=["DETable", "DEFile"],
             parameterType="Required",
             direction="Input"
         )
+
         param1 = arcpy.Parameter(
             displayName="CIS Service Info Layer",
-            name="CISLayer",
+            name="cis_layer",
             datatype="GPLayer",
             parameterType="Required",
             direction="Input"
         )
+
         param2 = arcpy.Parameter(
             displayName="Name of Output Shapefile",
             name="output_shapefile",
@@ -37,6 +38,7 @@ class CNIM(object):
             parameterType="Required",
             direction="Input"
         )
+
         param3 = arcpy.Parameter(
             displayName="Name of Output CSV",
             name="output_csv",
@@ -44,14 +46,17 @@ class CNIM(object):
             parameterType="Required",
             direction="Input"
         )
+
         param4 = arcpy.Parameter(
             displayName="Output Folder",
-            name="outputfolder",
+            name="output_folder",
             datatype="DEFolder",
             parameterType="Required",
             direction="Input"
         )
+
         params = [param0, param1, param2, param3, param4]
+
         return params
 
     def isLicensed(self):
@@ -72,8 +77,8 @@ class CNIM(object):
 
         try: 
             # Add input table to project
-            current_map.addTable(input_table)
-        
+            current_map.addDataFromPath(input_table)
+
             # Conduct join on CIS feature class
             CIS_join_field = "Service ID"
             table_join_field = "ServLoc"
@@ -95,13 +100,16 @@ class CNIM(object):
             lat_field = "Latitude"
             long_field = "Longitude"
             arcpy.management.CalculateGeometryAttributes(output_shapefile, [
-                [lat_field, "POINT_Y"]
+                [lat_field, "POINT_Y"],
                 [long_field, "POINT_X"]
             ])
 
             # Export new table as .csv
-            # csv_output = parameters[3].valueAsText
-            # arcpy.conversion.TableToTable(output_shapefile, "placeholder directory", csv_output)
+            csv_output = parameters[3].valueAsText
+            arcpy.conversion.TableToTable(output_shapefile, "placeholder directory", csv_output)
+
+            # Clean up in-memory data
+            arcpy.management.Delete(join_output)
 
             project.save()
         
