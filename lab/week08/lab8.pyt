@@ -71,7 +71,7 @@ class CNIM(object):
     def execute(self, parameters, messages):
         try: 
             # Define project, map, input table
-            gdb = "C:/DevSource/676_Final_CNIM/676_Final_CNIM.gdb"
+            gdb = "C:/Users/kkubitz/OneDrive - City of Georgetown/Documents/ArcGIS/Projects/676_Final_CNIM/676_Final_CNIM.gdb"
             project = arcpy.mp.ArcGISProject("CURRENT")
             current_map = project.listMaps('Map')[0]
             in_table = parameters[0].valueAsText
@@ -83,7 +83,7 @@ class CNIM(object):
             current_map.addDataFromPath(gdb_table)
 
             # Add CIS layer to project
-            sde = "C/DevSource/676_Final_CNIM/Editor.sde/map.GTOWN.CIS"
+            sde = "C:/Users/kkubitz/OneDrive - City of Georgetown/Documents/ArcGIS/Projects/676_Final_CNIM/Editor.sde"
             in_feature = parameters[1].valueAsText
             CIS = {sde}/{in_feature}
             # CIS = arcpy.MakeFeatureLayer_management(in_feature, "CIS_layer")
@@ -120,7 +120,8 @@ class CNIM(object):
 
             project.save()
         
-        except 
+        except arcpy.ExecuteError:
+            messages.addErrorMEssage(f"ArcPy error: {arcpy.GetMessages(2)}")
 
         return
  

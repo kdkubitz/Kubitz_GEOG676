@@ -1,5 +1,4 @@
-import arcpy
-import os
+import arcpy, os
 
 class Toolbox(object):
     def __init__(self):
@@ -24,16 +23,16 @@ class Converter(object):
         )
         # Output Feature Class Name
         param1 = arcpy.Parameter(
-            displayName="Output Feature Class",
+            displayName="Output File Name",
             name="out_feature",
             datatype="GPString",
             parameterType="Required",
             direction="Input"
         )
-        # Output GDB
+        # Output Folder
         param2 = arcpy.Parameter(
-            displayName="Output GDB",
-            name="out_gdb",
+            displayName="Output Folder",
+            name="out_folder",
             datatype="DEFolder",
             parameterType="Required",
             direction="Input"
@@ -43,19 +42,25 @@ class Converter(object):
 
     def execute(self, parameters, messages):
         try: 
+            arcpy.ResetEnvironments()
             project = arcpy.mp.ArcGISProject("CURRENT")
             current_map = project.listMaps('Map')[0]
 
-            in_kml = parameters[0]
-            out_name = parameters[1]
-            out_gdb = parameters[2]
+            in_kml = parameters[0].valueAsText
+            out_name = parameters[1].valueAsText
+            out_folder = parameters[2].valueAsText
 
-            arcpy.KMLToLayer_conversion(in_kml, os.path.dirname(out_gdb), out_name)
+            arcpy.KMLToLayer_conversion(in_kml, out_folder, out_name)
+            
+            out_feature = os.path.join(out_folder, out_name, "Placemarks")
+            out_path = r"{}".format(out_feature)
 
-            current_map.addDataFromPath(out_name)
+            arcpy.MakeFeatureLayer_management(out_path, "temp_layer")
+            current_map.addLayer(arcpy.mp.Layer("temp_layer"))
 
             project.save()
         
-        except Exception as e:
-            messages.addErrorMessage(f"An error occurred: {e}")
-
+        except arcpy.ExecuteError:
+            messages.addErrorMessage(f"ArcPy error: {arcpy.GetMessages(2)}")
+        
+        return None
