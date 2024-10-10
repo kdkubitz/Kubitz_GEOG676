@@ -69,52 +69,60 @@ class CNIM(object):
         return
 
     def execute(self, parameters, messages):
-        # define project, map, input table
-        project = arcpy.mp.ArcGISProject("CURRENT")
-        current_map = project.listMaps('Map')[0]
-        input_table = parameters[0].valueAsText
-        CIS = parameters[1].valueAsText
-
         try: 
+            # Define project, map, input table
+            gdb = "C:/DevSource/676_Final_CNIM/676_Final_CNIM.gdb"
+            project = arcpy.mp.ArcGISProject("CURRENT")
+            current_map = project.listMaps('Map')[0]
+            in_table = parameters[0].valueAsText
+            
+
             # Add input table to project
-            current_map.addDataFromPath(input_table)
+            gdb_table_result = arcpy.TableToGeodatabase_conversion(in_table, gdb)
+            gdb_table = gdb_table_result.getOutput(0)
+            current_map.addDataFromPath(gdb_table)
+
+            # Add CIS layer to project
+            sde = "C/DevSource/676_Final_CNIM/Editor.sde/map.GTOWN.CIS"
+            in_feature = parameters[1].valueAsText
+            CIS = {sde}/{in_feature}
+            # CIS = arcpy.MakeFeatureLayer_management(in_feature, "CIS_layer")
 
             # Conduct join on CIS feature class
+            arcpy.env.qualifiedFieldNames = False
             CIS_join_field = "Service ID"
             table_join_field = "ServLoc"
-            join_output = "in_memory\\CIS_join"
-            arcpy.management.AddJoin(CIS, CIS_join_field, input_table, table_join_field)
+            join_output = arcpy.management.AddJoin(CIS, CIS_join_field, gdb_table, table_join_field)
 
-            # Perform Select by Attributes on resulting joined table
+            # Perform selection on resulting joined table
             selection_query = "ServLoc IS NOT NULL"
             arcpy.management.SelectLayerByAttribute(join_output, "NEW SELECTION", selection_query)
 
             # Export results to shapefile
-            output_shapefile = parameters[2].valueAsText
-            arcpy.management.CopyFeatures(join_output, output_shapefile)
+            out_feature = parameters[2].valueAsText
+            result = arcpy.management.CopyFeatures(join_output, out_feature)
 
             # Add new shapefile to map
-            current_map.addDataFromPath(output_shapefile)
+            # current_map.addDataFromPath(out_feature)
 
-            # Calculate Geometry on Lat / Long (is it possible to swap fields?)
+            # Calculate Geometry 
             lat_field = "Latitude"
             long_field = "Longitude"
-            arcpy.management.CalculateGeometryAttributes(output_shapefile, [
+            arcpy.management.CalculateGeometryAttributes(result, [
                 [lat_field, "POINT_Y"],
                 [long_field, "POINT_X"]
             ])
 
             # Export new table as .csv
-            csv_output = parameters[3].valueAsText
-            arcpy.conversion.TableToTable(output_shapefile, "placeholder directory", csv_output)
-
-            # Clean up in-memory data
-            arcpy.management.Delete(join_output)
+            out_table = parameters[3].valueAsText
+            out_folder = parameters[4].valueAsText
+            arcpy.conversion.TableToTable(out_feature, out_folder, out_table)
 
             project.save()
         
         except Exception as e:
             messages.addErrorMessage(f"An error occurred: {e}")
+            print(arcpy.GetMessages())
 
         return
  
