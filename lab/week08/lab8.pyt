@@ -120,9 +120,7 @@ class CNIM(object):
 
             project.save()
         
-        except Exception as e:
-            messages.addErrorMessage(f"An error occurred: {e}")
-            print(arcpy.GetMessages())
+        except 
 
         return
  
