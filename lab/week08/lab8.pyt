@@ -1,5 +1,5 @@
-import arcpy
-import arcpy.conversion
+import arcpy, os
+
 import arcpy.management
 
 class Toolbox(object):
@@ -16,16 +16,16 @@ class CNIM(object):
 
     def getParameterInfo(self):
         param0 = arcpy.Parameter(
-            displayName="Input CSV Table",
-            name="input_table",
-            datatype=["DETable", "DEFile"],
+            displayName="Input Table",
+            name="in_table",
+            datatype="DETable",
             parameterType="Required",
             direction="Input"
         )
 
         param1 = arcpy.Parameter(
             displayName="CIS Service Info Layer",
-            name="cis_layer",
+            name="in_layer",
             datatype="GPLayer",
             parameterType="Required",
             direction="Input"
@@ -33,7 +33,7 @@ class CNIM(object):
 
         param2 = arcpy.Parameter(
             displayName="Name of Output Shapefile",
-            name="output_shapefile",
+            name="out_shp_name",
             datatype="GPString",
             parameterType="Required",
             direction="Input"
@@ -41,7 +41,7 @@ class CNIM(object):
 
         param3 = arcpy.Parameter(
             displayName="Name of Output CSV",
-            name="output_csv",
+            name="out_csv_name",
             datatype="GPString",
             parameterType="Required",
             direction="Input"
@@ -49,7 +49,7 @@ class CNIM(object):
 
         param4 = arcpy.Parameter(
             displayName="Output Folder",
-            name="output_folder",
+            name="out_folder",
             datatype="DEFolder",
             parameterType="Required",
             direction="Input"
@@ -70,58 +70,47 @@ class CNIM(object):
 
     def execute(self, parameters, messages):
         try: 
-            # Define project, map, input table
-            gdb = "C:/Users/kkubitz/OneDrive - City of Georgetown/Documents/ArcGIS/Projects/676_Final_CNIM/676_Final_CNIM.gdb"
-            project = arcpy.mp.ArcGISProject("CURRENT")
-            current_map = project.listMaps('Map')[0]
+            # Define project, map 
+            p = arcpy.mp.ArcGISProject("CURRENT")
+            m = p.listMaps('Map')[0]
+
+            # Define inputs 
             in_table = parameters[0].valueAsText
-            
+            in_layer = parameters[1].valueAsText
+            out_folder = parameters[4].valueAsText
+            out_shp = os.path.join(out_folder, parameters[2].valueAsText + ".shp")
+            out_csv = os.path.join(out_folder, parameters[3].valueAsText + ".csv")
 
-            # Add input table to project
-            gdb_table_result = arcpy.TableToGeodatabase_conversion(in_table, gdb)
-            gdb_table = gdb_table_result.getOutput(0)
-            current_map.addDataFromPath(gdb_table)
+            # Remove existing joins
+            arcpy.management.RemoveJoin(in_layer)
 
-            # Add CIS layer to project
-            sde = "C:/Users/kkubitz/OneDrive - City of Georgetown/Documents/ArcGIS/Projects/676_Final_CNIM/Editor.sde"
-            in_feature = parameters[1].valueAsText
-            CIS = {sde}/{in_feature}
-            # CIS = arcpy.MakeFeatureLayer_management(in_feature, "CIS_layer")
+            # Make a table view of the CIS layer's attribute table
+            layer_table_view = "in_memory\\layer_table"
+            arcpy.management.MakeTableView(in_layer, layer_table_view)
 
-            # Conduct join on CIS feature class
-            arcpy.env.qualifiedFieldNames = False
-            CIS_join_field = "Service ID"
-            table_join_field = "ServLoc"
-            join_output = arcpy.management.AddJoin(CIS, CIS_join_field, gdb_table, table_join_field)
+            # Perform the join
+            joined_table = arcpy.management.AddJoin(layer_table_view, "Service ID", in_table, "ServLoc")
 
-            # Perform selection on resulting joined table
+            # Select by attribute
             selection_query = "ServLoc IS NOT NULL"
-            arcpy.management.SelectLayerByAttribute(join_output, "NEW SELECTION", selection_query)
+            selected_rows = arcpy.management.SelectLayerByAttribute(joined_table, "NEW SELECTION", selection_query)
 
-            # Export results to shapefile
-            out_feature = parameters[2].valueAsText
-            result = arcpy.management.CopyFeatures(join_output, out_feature)
+            # Export selection to shapefile
+            arcpy.management.CopyFeatures(selected_rows, out_shp)
 
-            # Add new shapefile to map
-            # current_map.addDataFromPath(out_feature)
+            # Add shapefile to map
+            m.addDataFromPath(out_shp)
 
             # Calculate Geometry 
-            lat_field = "Latitude"
-            long_field = "Longitude"
-            arcpy.management.CalculateGeometryAttributes(result, [
-                [lat_field, "POINT_Y"],
-                [long_field, "POINT_X"]
-            ])
+            arcpy.management.CalculateGeometryAttributes(out_shp, [["Latitude", "POINT_Y"], ["Longitude", "POINT_X"]])
 
-            # Export new table as .csv
-            out_table = parameters[3].valueAsText
-            out_folder = parameters[4].valueAsText
-            arcpy.conversion.TableToTable(out_feature, out_folder, out_table)
+            # Export table to CSV
+            arcpy.conversion.TableToTable(out_shp, out_folder, out_csv)
 
-            project.save()
+            p.save()
         
         except arcpy.ExecuteError:
-            messages.addErrorMEssage(f"ArcPy error: {arcpy.GetMessages(2)}")
+            messages.addErrorMessage(f"ArcPy error: {arcpy.GetMessages(2)}")
 
         return
  

@@ -1,66 +1,97 @@
-import arcpy, os
+import arcpy, time
 
 class Toolbox(object):
     def __init__(self):
-        self.label = "Toolbox"
-        self.alias = ""
-        self.tools = [Converter]
+        self.label = "Buffer Toolbox"
+        self.alias = "buffer_toolbox"
+        self.tools = [BufferTool]
 
-class Converter(object):
+class BufferTool(object):
     def __init__(self):
-        self.label = "KML to Feature Class"
-        self.description = ""
+        self.label = "Buffer Creation Tool"
+        self.description = "Creates a buffer around the input layer."
         self.canRunInBackground = False
 
     def getParameterInfo(self):
-        # Input KML
+
+        # Input Layer
         param0 = arcpy.Parameter(
-            displayName="Input KML",
-            name="in_kml",
-            datatype="DEFile",
+            displayName="Input Layer",
+            name="input_layer",
+            datatype="GPFeatureLayer",
             parameterType="Required",
             direction="Input"
         )
-        # Output Feature Class Name
+
+        # Buffer Distance
         param1 = arcpy.Parameter(
-            displayName="Output File Name",
-            name="out_feature",
+            displayName="Buffer Distance",
+            name="buffer_distance",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input"
+        )
+        
+        # Buffer Units
+        param2 = arcpy.Parameter(
+            displayName="Buffer Units",
+            name="buffer_units",
             datatype="GPString",
             parameterType="Required",
             direction="Input"
         )
-        # Output Folder
-        param2 = arcpy.Parameter(
-            displayName="Output Folder",
-            name="out_folder",
-            datatype="DEFolder",
+        param2.filter.type = "ValueList"
+        param2.filter.list = ["Meters", "Kilometers", "Feet", "Miles"]
+
+        # Output Layer
+        param3 = arcpy.Parameter(
+            displayName="Output Layer",
+            name="output_layer",
+            datatype="DEFeatureClass",
             parameterType="Required",
-            direction="Input"
-        ) 
-        params = [param0, param1, param2]
+            direction="Output"
+        )
+        
+        params = [param0, param1, param2, param3]
         return params
 
+    def isLicensed(self):
+        return True
+
     def execute(self, parameters, messages):
-        try: 
-            arcpy.ResetEnvironments()
-            project = arcpy.mp.ArcGISProject("CURRENT")
-            current_map = project.listMaps('Map')[0]
 
-            in_kml = parameters[0].valueAsText
-            out_name = parameters[1].valueAsText
-            out_folder = parameters[2].valueAsText
+        # Define inputs
+        in_layer = parameters[0].valueAsText
+        buff_dist = parameters[1].valueAsText
+        buff_unit = parameters[2].valueAsText
+        out_layer = parameters[3].valueAsText
 
-            arcpy.KMLToLayer_conversion(in_kml, out_folder, out_name)
+        try:
+            arcpy.SetProgressor("step", "Initializing...", 0, 100, 33)
+
+            # Progressor Step 1
+            arcpy.AddMessage("Initializing...")
+            arcpy.SetProgressorPosition(33)
+
+            # Create buffer 
+            arcpy.analysis.Buffer(in_layer, out_layer, f"{buff_dist} {buff_unit}")
             
-            out_feature = os.path.join(out_folder, out_name, "Placemarks")
-            out_path = r"{}".format(out_feature)
+            # Progressor Step 2
+            arcpy.SetProgressorLabel("Adding Buffer...")
+            arcpy.SetProgressorPosition(66)
 
-            arcpy.MakeFeatureLayer_management(out_path, "temp_layer")
-            current_map.addLayer(arcpy.mp.Layer("temp_layer"))
-
-            project.save()
-        
-        except arcpy.ExecuteError:
+        except arcpy.ExecuteError as e:
             messages.addErrorMessage(f"ArcPy error: {arcpy.GetMessages(2)}")
-        
-        return None
+
+        except Exception as e:
+            messages.addErrorMessage(f"An error occurred: {e}")
+
+        else:
+            arcpy.AddMessage("Process completed successfully.")
+            
+        finally:
+            # Progressor Step 3
+            arcpy.SetProgressorLabel("Finalizing...")
+            arcpy.SetProgressorPosition(100)
+
+        return
